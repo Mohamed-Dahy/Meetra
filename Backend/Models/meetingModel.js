@@ -22,13 +22,10 @@ const meetingSchema = new mongoose.Schema(
     location: {
       type: String,
       required: true,
+      trim: true,
     },
-    participants: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
-    ],
+
+    // Workspace & Ownership
     workspace: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Workspace",
@@ -44,15 +41,64 @@ const meetingSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    createdAt: {
-      type: Date,
-      default: Date.now,
+
+    // Participants
+    participants: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+
+    // Transcription & Status
+    transcript: {
+      type: String,
+      default: "",
+    },
+    status: {
+      type: String,
+      enum: ["upcoming", "processing", "completed", "canceled"],
+      default: "upcoming",
+    },
+
+    // Optional future AI fields (ready for analysis)
+    summary: {
+      type: String,
+      default: "",
+    },
+    actionItems: [
+      {
+        type: String,
+        default: [],
+      },
+    ],
+    keyDecisions: [
+      {
+        type: String,
+        default: [],
+      },
+    ],
+    sentiment: {
+      type: String,
+      enum: ["positive", "neutral", "negative"],
+      default: "neutral",
+    },
+    healthScore: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 0,
     },
   },
   {
-    timestamps: true,
+    timestamps: true, // This automatically adds createdAt & updatedAt
   }
 );
+
+// Optional: Add index for better performance
+meetingSchema.index({ workspace: 1, title: 1 }); // Prevent duplicate titles per workspace
+meetingSchema.index({ createdBy: 1 });
+meetingSchema.index({ status: 1 });
 
 const Meeting = mongoose.model("Meeting", meetingSchema);
 

@@ -2,93 +2,179 @@ const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
 const Meeting = require("../Models/meetingmodel");
+const Workspace = require("../Models/workspaceModel");
+const User = require("../Models/userModel");
 
 const exportPDF = async (req, res) => {
   try {
     const { meetingId } = req.body;
 
     if (!meetingId) {
-      return res
-        .status(400)
-        .json({ message: "meetingId is required" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "meetingId is required" 
+      });
     }
 
-    const meeting = await Meeting.findById(meetingId).populate(
-      "participants",
-      "name email"
-    );
+    // Fetch meeting with participants
+    const meeting = await Meeting.findById(meetingId)
+      .populate("participants", "name email")
+      .populate("createdBy", "name email")
+      .populate("workspace", "name owner");
 
     if (!meeting) {
-      return res.status(404).json({ message: "Meeting not found" });
+      return res.status(404).json({ 
+        success: false, 
+        message: "Meeting not found" 
+      });
     }
 
+    // === Workspace & Permission Validation (Same as createMeeting & transcription) ===
+    const workspace = await Workspace.findById(meeting.workspace);
+    if (!workspace) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Workspace not found" 
+      });
+    }
+
+    // Only workspace owner OR meeting creator can export PDF
+        const owner = await User.findById(workspace.owner);
+    if (workspace.owner.toString() !== owner._id.toString() && 
+        meeting.createdBy.toString() !== owner._id.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Only workspace owner or meeting creator can export this meeting report" 
+      });
+    }
+
+    // Optional: Allow participants to export as well (recommended for team use)
+    const isParticipant = meeting.participants.some(
+      (p) => p._id.toString() === owner._id.toString()
+    );
+    if (!isParticipant && 
+        workspace.owner.toString() !== owner._id.toString() && 
+        meeting.createdBy.toString() !== owner._id.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "You must be a participant, owner, or creator to export the report" 
+      });
+    }
+
+    // Create pdfs directory if not exists
     const pdfsDir = path.join(__dirname, "..", "pdfs");
     if (!fs.existsSync(pdfsDir)) {
       fs.mkdirSync(pdfsDir, { recursive: true });
     }
 
-    const fileName = `meeting-${meeting._id}.pdf`;
+    const fileName = `meetra-meeting-${meeting._id}.pdf`;
     const filePath = path.join(pdfsDir, fileName);
 
-    const pdfDoc = new PDFDocument({ margin: 50 });
-    const writeStream = fs.createWriteStream(filePath);
+    const pdfDoc = new PDFDocument({ 
+      margin: 50,
+      size: "A4"
+    });
 
+    const writeStream = fs.createWriteStream(filePath);
     pdfDoc.pipe(writeStream);
 
+    // === Meetra Branding Header ===
     pdfDoc
-      .fontSize(18)
-      .text("Meetra - Meeting Transcript", { align: "center" })
-      .moveDown();
+      .fontSize(24)
+      .fillColor("#6366f1") // Your accent color
+      .text("MEETRA", { align: "center" })
+      .moveDown(0.5);
 
     pdfDoc
+      .fontSize(16)
+      .fillColor("#000000")
+      .text("Meeting Intelligence Report", { align: "center" })
+      .moveDown(1);
+
+    // Meeting Details
+    pdfDoc
       .fontSize(14)
+      .fillColor("#1e2937")
       .text(`Title: ${meeting.title}`)
-      .text(`Date: ${meeting.date.toISOString().split("T")[0]}`)
+      .text(`Date: ${new Date(meeting.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`)
       .text(`Time: ${meeting.time}`)
       .text(`Location: ${meeting.location}`)
       .moveDown();
 
+    // Participants
     if (meeting.participants && meeting.participants.length > 0) {
       pdfDoc
         .fontSize(12)
-        .text(
-          "Participants: " +
-            meeting.participants
-              .map((p) => p.name || p.email)
-              .join(", ")
-        )
-        .moveDown();
+        .text("Participants:")
+        .moveDown(0.3);
+
+      meeting.participants.forEach((participant, index) => {
+        pdfDoc.text(`• ${participant.name || participant.email}`);
+      });
+      pdfDoc.moveDown();
     }
 
+    // Transcript Section
     pdfDoc
       .fontSize(14)
-      .text(`Transcript: ${meeting.transcript.text}`, { underline: true })
-      .moveDown();
+      .fillColor("#1e2937")
+      .text("Transcript", { underline: true })
+      .moveDown(0.5);
 
-    pdfDoc.fontSize(12).text(meeting.transcript || "No transcript available.");
+    if (meeting.transcript && meeting.transcript.trim() !== "") {
+      pdfDoc
+        .fontSize(11)
+        .fillColor("#334155")
+        .text(meeting.transcript, {
+          align: "left",
+          lineGap: 4,
+          paragraphGap: 8
+        });
+    } else {
+      pdfDoc
+        .fontSize(11)
+        .fillColor("#ef4444")
+        .text("No transcript available for this meeting.");
+    }
+
+    pdfDoc.moveDown(2);
+
+    // Footer with Meetra branding
+    pdfDoc
+      .fontSize(10)
+      .fillColor("#64748b")
+      .text("Generated by Meetra • AI-Powered Meeting Intelligence", { 
+        align: "center" 
+      })
+      .text(`Report Date: ${new Date().toLocaleDateString()}`, { align: "center" });
 
     pdfDoc.end();
 
+    // Send response when PDF is fully written
     writeStream.on("finish", () => {
       return res.status(200).json({
-        message: "PDF exported successfully",
+        success: true,
+        message: "PDF report generated successfully",
         meetingId: meeting._id,
-        fileName,
-        filePath,
+        fileName: fileName,
+        downloadUrl: `/pdfs/${fileName}`   // You can serve this statically later
       });
     });
 
     writeStream.on("error", (err) => {
-      console.error("Error writing PDF file:", err);
-      return res.status(500).json({
-        message: "Failed to write PDF file",
+      console.error("PDF Write Error:", err);
+      return res.status(500).json({ 
+        success: false, 
+        message: "Failed to generate PDF file" 
       });
     });
+
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({
+    console.error("Error in exportPDF:", error);
+    return res.status(500).json({ 
+      success: false, 
       message: "Internal server error",
-      error: error.message,
+      error: error.message 
     });
   }
 };

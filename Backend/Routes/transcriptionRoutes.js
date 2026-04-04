@@ -11,12 +11,13 @@ const router = express.Router();
 const upload = multer({
   dest: "uploads/",
   limits: {
-    fileSize: 25 * 1024 * 1024, // 25MB max for Whisper on Groq
+    fileSize: 25 * 1024 * 1024, // 25MB
   },
 });
 
-router.post("/audio", protect, upload.single("audio"), transcribeAudio);
-router.post("/text", protect, transcribeText);
+
+router.post("/audio", protect, upload.single("file"), transcribeAudio); //done
+
+router.post("/text", protect, transcribeText); // done
 
 module.exports = router;
-

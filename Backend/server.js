@@ -24,8 +24,8 @@ app.get('/', (req, res) => {
 
 app.use('/meetra/auth', authRoutes);
 app.use('/meetra/meeting', meetingRoutes);
-app.use('/api/transcription', transcriptionRoutes);
-app.use('/api/export', exportPDFRoutes);
+app.use('/meetra/api/transcription', transcriptionRoutes);
+app.use('/meetra/api/export', exportPDFRoutes);
 app.use('/meetra/connections',connectionRoutes)
 app.use('/meetra/workspaces',workspaceRoutes)
 const PORT = process.env.PORT;

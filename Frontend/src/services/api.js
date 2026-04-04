@@ -1,6 +1,7 @@
+// src/api.js
 import axios from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -18,9 +19,7 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 // Response interceptor for error handling
@@ -28,7 +27,6 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid
       localStorage.removeItem("meetra_token");
       localStorage.removeItem("meetra_user");
       window.location.href = "/auth";
