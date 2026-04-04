@@ -191,18 +191,3 @@
 - Heading → Sora  
 - Body → DM Sans  
 
----
-
-## ⚠️ Important Rules For AI
-
-1. Use **CommonJS** (`require/module.exports`) in backend  
-2. Protect all backend routes using `{ protect }` middleware  
-3. All frontend API calls use `api.js` (auto-attaches JWT)  
-4. JWT stored in `localStorage` as `meetra_token`  
-5. User stored in `localStorage` as `meetra_user`  
-6. Do NOT modify existing CSS variables or design system  
-7. Do NOT change sidebar, topbar, or dashboard structure  
-8. Maintain dark SaaS design aesthetic  
-9. Error responses format:
-   ```json
-   { "message": "..." }
