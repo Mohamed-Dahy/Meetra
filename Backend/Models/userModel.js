@@ -45,7 +45,21 @@ const userSchema = new mongoose.Schema(
         ref: "Meeting",
       },
     ],
-    friends: [
+    connections: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    
+    sentRequests: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    
+    receivedRequests: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",

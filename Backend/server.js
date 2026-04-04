@@ -6,7 +6,8 @@ const authRoutes = require('./Routes/authRoutes');
 const meetingRoutes = require('./Routes/meetingRoutes');
 const transcriptionRoutes = require('./Routes/transcriptionRoutes');
 const exportPDFRoutes = require('./Routes/exportPDFRoutes');
-
+const connectionRoutes = require('./Routes/connectionRoutes');
+const workspaceRoutes = require('./Routes/workspaceRoutes')
 
 dotenv.config();
 
@@ -25,9 +26,13 @@ app.use('/meetra/auth', authRoutes);
 app.use('/meetra/meeting', meetingRoutes);
 app.use('/api/transcription', transcriptionRoutes);
 app.use('/api/export', exportPDFRoutes);
+app.use('/meetra/connections',connectionRoutes)
+app.use('/meetra/workspaces',workspaceRoutes)
 const PORT = process.env.PORT;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+
 

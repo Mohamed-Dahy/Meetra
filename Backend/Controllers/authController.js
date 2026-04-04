@@ -38,4 +38,16 @@ const loginUser = async (req, res) => {
   res.status(200).json({ message: "User logged in successfully, your token will last for 1 day", user, token });
 };
 
-module.exports = { registerUser, loginUser };
+
+const getUsers = async (req,res)=>{
+  try {
+    const users = await User.find().select("-password");
+    res.status(200).json(users);
+  } catch (err) { 
+      res.status(500).json({ message: "Failed to fetch users" });
+  }
+
+}
+
+
+module.exports = { registerUser, loginUser, getUsers };

@@ -1,6 +1,4 @@
-// services/meetingService.js
-// All meeting API calls using the existing api.js instance
-// Each function handles errors cleanly and returns data
+
 
 import api from './api';
 
@@ -10,7 +8,7 @@ import api from './api';
  */
 export async function getAllMeetings() {
   try {
-    const res = await api.get('/meetings');
+    const res = await api.get('/meeting/get-meetings');
     return res.data.meetings;
   } catch (err) {
     console.error('Error fetching meetings:', err);
@@ -25,7 +23,7 @@ export async function getAllMeetings() {
  */
 export async function createMeeting(title) {
   try {
-    const res = await api.post('/meetings', { title });
+    const res = await api.post('/meeting/create', { title });
     return res.data.meeting;
   } catch (err) {
     console.error('Error creating meeting:', err);
@@ -40,7 +38,7 @@ export async function createMeeting(title) {
  */
 export async function getMeetingById(id) {
   try {
-    const res = await api.get(`/meetings/${id}`);
+    const res = await api.get(`/meeting/get-meeting/${id}`);
     return res.data.meeting;
   } catch (err) {
     console.error('Error fetching meeting:', err);
@@ -56,7 +54,7 @@ export async function getMeetingById(id) {
  */
 export async function updateMeeting(id, title) {
   try {
-    const res = await api.put(`/meetings/${id}`, { title });
+    const res = await api.put(`/meeting/update/${id}`, { title });
     return res.data.meeting;
   } catch (err) {
     console.error('Error updating meeting:', err);
@@ -71,7 +69,7 @@ export async function updateMeeting(id, title) {
  */
 export async function deleteMeeting(id) {
   try {
-    await api.delete(`/meetings/${id}`);
+    await api.delete(`/meeting/delete/${id}`);
     return true;
   } catch (err) {
     console.error('Error deleting meeting:', err);
