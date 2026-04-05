@@ -14,7 +14,7 @@ router.get('/get-workspaces', workspaceController.getMyWorkspaces); // done
 
 router.get('/get-workspace/:id', workspaceController.getWorkspaceById); // done 
 
-// done router.put('/update-workspace/:id', workspaceController.updateWorkspace);
+router.put('/update-workspace/:id', workspaceController.updateWorkspace);
 
 router.delete('/delete-workspace/:id', workspaceController.deleteWorkspace);// done 
 

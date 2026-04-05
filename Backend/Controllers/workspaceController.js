@@ -6,8 +6,8 @@ const createWorkspace = async (req, res) => {
   try {
     const { name, description, avatar , isPersonal } = req.body;
 
-    if (!name || !name.trim() || !description) {
-      return res.status(400).json({ message: 'Workspace name and description is required' });
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: 'Workspace name is required' });
     }
 
     const workspace = new Workspace({
