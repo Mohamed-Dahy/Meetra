@@ -71,7 +71,7 @@ const ConnectionsTab = () => {
     const fetchUsers = async () => {
       setUsersLoading(true);
       try {
-        const res = await api.get('/meetra/auth/users');
+        const res = await api.get('/auth/users');
         setAllUsers(res.data.users || res.data.data || res.data || []);
       } catch (err) {
         console.error(err);

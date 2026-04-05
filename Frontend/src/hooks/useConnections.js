@@ -11,37 +11,29 @@ export const useConnections = () => {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     setError(null);
-
     try {
       const [connsRes, receivedRes, sentRes] = await Promise.all([
         connectionService.getMyConnections(),
         connectionService.getReceivedRequests(),
         connectionService.getSentRequests(),
       ]);
-
-      // ✅ safer data extraction
-      setConnections(connsRes?.data?.connections || connsRes?.data || []);
-      setReceivedRequests(receivedRes?.data?.requests || receivedRes?.data || []);
-      setSentRequests(sentRes?.data?.requests || sentRes?.data || []);
-
+      setConnections(connsRes.data.connections || []);
+      setReceivedRequests(receivedRes.data.requests || []);
+      setSentRequests(sentRes.data.sentRequests || sentRes.data.requests || []);
     } catch (err) {
       console.error(err);
-      setError(err?.response?.data?.message || 'Failed to fetch connections');
+      setError(err.response?.data?.message || 'Failed to fetch connections');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
-
-  // ─── Actions ───────────────────────────────────────────────
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const sendRequest = async (userId) => {
     try {
       await connectionService.sendRequest(userId);
-      await fetchAll(); // refresh state
+      await fetchAll();
     } catch (err) {
       console.error(err);
       throw err;
@@ -79,19 +71,9 @@ export const useConnections = () => {
   };
 
   return {
-    connections,
-    receivedRequests,
-    sentRequests,
-    loading,
-    error,
-
-    // actions
-    sendRequest,
-    acceptRequest,
-    rejectRequest,
-    removeConnection,
-
-    // refetch
+    connections, receivedRequests, sentRequests,
+    loading, error,
+    sendRequest, acceptRequest, rejectRequest, removeConnection,
     fetchAll,
   };
 };

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar, Clock, MapPin, FileText, AlignLeft, Users, Layout } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import api from '../../services/api';
+import * as workspaceService from '../../services/workspaceService';
+import * as connectionService from '../../services/connectionService';
 
 const T = {
   card: '#08080f', borderH: 'rgba(99,102,241,0.45)',
@@ -41,11 +42,11 @@ const CreateMeetingModal = ({ onClose, onSubmit }) => {
     const load = async () => {
       try {
         const [wsRes, connRes] = await Promise.all([
-          api.get('/meetra/workspaces'),
-          api.get('/meetra/connections'),
+          workspaceService.getMyWorkspaces(),
+          connectionService.getMyConnections(),
         ]);
-        setWorkspaces(wsRes.data.workspaces || []);
-        setConnections(connRes.data.connections || []);
+        setWorkspaces(wsRes.data.workspaces || wsRes.data.data || []);
+        setConnections(connRes.data.connections || connRes.data || []);
       } catch (err) {
         console.error(err);
       } finally {
