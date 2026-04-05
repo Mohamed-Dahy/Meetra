@@ -6,17 +6,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../hooks/useAuth";
 import MobileMenu from "./MobileMenu";
 
-/**
- * Navbar — public landing page nav.
- *
- * When the user IS authenticated it shows a workspace-aware right side:
- *   "My Workspaces  ›  Go to Dashboard"
- * When not authenticated it shows the standard Sign in / Get started flow.
- *
- * The component intentionally stays out of the dashboard shell
- * (Dashboard.jsx has its own sidebar + topbar). It is only rendered
- * on public/marketing pages (/, /pricing, /about, etc.).
- */
 
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=DM+Sans:wght@400;500&display=swap');
