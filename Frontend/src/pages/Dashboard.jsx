@@ -14,6 +14,7 @@ import WorkspacesTab from '../components/dashboard/WorkspacesTab';
 import CreateMeetingModal from '../components/meetings/CreateMeetingModal';
 import EditMeetingModal from '../components/meetings/EditMeetingModal';
 import DeleteConfirmModal from '../components/meetings/DeleteConfirmModal';
+import ChatWidget from '../components/dashboard/ChatWidget';
 
 const T = {
   bg: '#04040c',
@@ -238,6 +239,9 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* ── Floating Chatbot ── */}
+      <ChatWidget />
 
       {/* ── Meeting Modals ── */}
       <AnimatePresence>
