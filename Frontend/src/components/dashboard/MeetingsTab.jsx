@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Clock, MapPin, Pencil, Trash2, Plus, Search, Calendar } from 'lucide-react';
+import { FileText, Clock, MapPin, Pencil, Trash2, Plus, Search, Calendar, Mic } from 'lucide-react';
 
 const T = {
   card: '#08080f', border: 'rgba(99,102,241,0.13)', borderH: 'rgba(99,102,241,0.45)',
@@ -44,7 +44,7 @@ const SkeletonRow = () => (
   </div>
 );
 
-const MeetingsTab = ({ meetings, loading, error, onNew, onEdit, onDelete }) => {
+const MeetingsTab = ({ meetings, loading, error, onNew, onEdit, onDelete, onTranscribe }) => {
   const [query, setQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
 
@@ -144,6 +144,14 @@ const MeetingsTab = ({ meetings, loading, error, onNew, onEdit, onDelete }) => {
             </div>
             <StatusBadge status={m.status} />
             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+              <motion.button onClick={() => onTranscribe(m)} whileTap={{ scale: 0.9 }}
+                title="Transcribe & Analyze"
+                style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid rgba(34,197,94,0.2)', background: 'rgba(34,197,94,0.07)', color: '#4ade80', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(34,197,94,0.15)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(34,197,94,0.07)'; }}
+              >
+                <Mic size={12} />
+              </motion.button>
               <motion.button onClick={() => onEdit(m)} whileTap={{ scale: 0.9 }}
                 title="Edit"
                 style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid rgba(99,102,241,0.2)', background: 'rgba(99,102,241,0.07)', color: '#818cf8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}

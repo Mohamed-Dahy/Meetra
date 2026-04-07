@@ -1,5 +1,13 @@
 {
+  "name": "meetra",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --names \"backend,frontend\" --prefix-colors \"magenta,cyan\" \"npm start --prefix Backend\" \"npm run dev --prefix Frontend\"",
+    "install:all": "npm install --prefix Backend && npm install --prefix Frontend"
+  },
   "dependencies": {
+    "concurrently": "^9.2.1",
     "prop-types": "^15.8.1"
   }
 }

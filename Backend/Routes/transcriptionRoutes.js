@@ -4,6 +4,7 @@ const { protect } = require("../middleware/authMiddleware");
 const {
   transcribeAudio,
   transcribeText,
+  analyzeMeeting,
 } = require("../Controllers/transcriptionController");
 
 const router = express.Router();
@@ -19,5 +20,7 @@ const upload = multer({
 router.post("/audio", protect, upload.single("file"), transcribeAudio); //done
 
 router.post("/text", protect, transcribeText); // done
+
+router.post("/analyze", protect, analyzeMeeting); // done
 
 module.exports = router;

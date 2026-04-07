@@ -187,7 +187,80 @@ const transcribeText = async (req, res) => {
   }
 };
 
+const analyzeMeeting = async (req, res) => {
+  try {
+    const { meetingId } = req.body;
+
+    if (!meetingId) {
+      return res.status(400).json({ success: false, message: "meetingId is required" });
+    }
+
+    const meeting = await Meeting.findById(meetingId);
+    if (!meeting) {
+      return res.status(404).json({ success: false, message: "Meeting not found" });
+    }
+
+    if (!meeting.transcript || !meeting.transcript.trim()) {
+      return res.status(400).json({ success: false, message: "Meeting has no transcript to analyze. Transcribe it first." });
+    }
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    const prompt = `You are an AI meeting analyst. Analyze the following meeting transcript and return a JSON object with exactly these fields:
+- "summary": a 2-3 sentence summary of the meeting
+- "actionItems": an array of strings, each a specific action item or task
+- "keyDecisions": an array of strings, each a key decision made in the meeting
+- "sentiment": one of "positive", "neutral", or "negative" based on the overall tone
+- "healthScore": an integer from 0 to 100 rating how productive this meeting was
+
+Return ONLY valid JSON with no markdown, no code blocks, no extra text.
+
+Transcript:
+${meeting.transcript}`;
+
+    const result = await model.generateContent(prompt);
+    const rawText = result?.response?.text() || "";
+
+    let analysis;
+    try {
+      const cleaned = rawText.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+      analysis = JSON.parse(cleaned);
+    } catch {
+      return res.status(500).json({ success: false, message: "Failed to parse AI response. Try again." });
+    }
+
+    meeting.summary = typeof analysis.summary === "string" ? analysis.summary : "";
+    meeting.actionItems = Array.isArray(analysis.actionItems) ? analysis.actionItems : [];
+    meeting.keyDecisions = Array.isArray(analysis.keyDecisions) ? analysis.keyDecisions : [];
+    meeting.sentiment = ["positive", "neutral", "negative"].includes(analysis.sentiment)
+      ? analysis.sentiment
+      : "neutral";
+    meeting.healthScore =
+      typeof analysis.healthScore === "number"
+        ? Math.min(100, Math.max(0, Math.round(analysis.healthScore)))
+        : 0;
+    await meeting.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Meeting analyzed successfully",
+      meetingId: meeting._id,
+      analysis: {
+        summary: meeting.summary,
+        actionItems: meeting.actionItems,
+        keyDecisions: meeting.keyDecisions,
+        sentiment: meeting.sentiment,
+        healthScore: meeting.healthScore,
+      },
+    });
+  } catch (error) {
+    console.error("Error in analyzeMeeting:", error);
+    return res.status(500).json({ success: false, message: "Failed to analyze meeting" });
+  }
+};
+
 module.exports = {
   transcribeAudio,
   transcribeText,
+  analyzeMeeting,
 };

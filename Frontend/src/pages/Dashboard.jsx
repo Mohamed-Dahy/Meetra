@@ -10,10 +10,12 @@ import OverviewTab from '../components/dashboard/OverviewTab';
 import MeetingsTab from '../components/dashboard/MeetingsTab';
 import ConnectionsTab from '../components/dashboard/ConnectionsTab';
 import WorkspacesTab from '../components/dashboard/WorkspacesTab';
+import AnalyticsTab from '../components/dashboard/AnalyticsTab';
 
 import CreateMeetingModal from '../components/meetings/CreateMeetingModal';
 import EditMeetingModal from '../components/meetings/EditMeetingModal';
 import DeleteConfirmModal from '../components/meetings/DeleteConfirmModal';
+import TranscribeModal from '../components/meetings/TranscribeModal';
 import ChatWidget from '../components/dashboard/ChatWidget';
 
 const T = {
@@ -49,24 +51,27 @@ const Dashboard = () => {
   const [showCreateMeeting, setShowCreateMeeting] = useState(false);
   const [editingMeeting, setEditingMeeting] = useState(null);
   const [deletingMeeting, setDeletingMeeting] = useState(null);
+  const [transcribingMeeting, setTranscribingMeeting] = useState(null);
 
   // Workspace modal
   const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
 
   const { user } = useAuth();
-  const { 
-    meetings, 
-    loading: meetingsLoading, 
-    error: meetingsError, 
-    createMeeting, 
-    updateMeeting, 
-    deleteMeeting 
+  const {
+    meetings,
+    loading: meetingsLoading,
+    error: meetingsError,
+    fetchMeetings,
+    createMeeting,
+    updateMeeting,
+    deleteMeeting
   } = useMeetings();
 
   // Open/Close handlers
   const openCreateMeeting = () => setShowCreateMeeting(true);
   const openEditMeeting = (meeting) => setEditingMeeting(meeting);
   const openDeleteMeeting = (meeting) => setDeletingMeeting(meeting);
+  const openTranscribeMeeting = (meeting) => setTranscribingMeeting(meeting);
 
   const openCreateWorkspace = () => setShowCreateWorkspace(true);
 
@@ -102,6 +107,7 @@ const Dashboard = () => {
             onNew={openCreateMeeting}
             onEdit={openEditMeeting}
             onDelete={openDeleteMeeting}
+            onTranscribe={openTranscribeMeeting}
           />
         );
       case 'connections':
@@ -113,7 +119,7 @@ const Dashboard = () => {
           />
         );
       case 'analytics':
-        return <ComingSoon label="Analytics" />;
+        return <AnalyticsTab meetings={meetings} />;
       case 'team':
         return <ComingSoon label="Team" />;
       default:
@@ -264,6 +270,13 @@ const Dashboard = () => {
             message={`Are you sure you want to delete "${deletingMeeting.title}"? This action cannot be undone.`}
             onClose={() => setDeletingMeeting(null)}
             onConfirm={() => deleteMeeting(deletingMeeting._id)}
+          />
+        )}
+        {transcribingMeeting && (
+          <TranscribeModal
+            meeting={transcribingMeeting}
+            onClose={() => setTranscribingMeeting(null)}
+            onSuccess={fetchMeetings}
           />
         )}
       </AnimatePresence>
