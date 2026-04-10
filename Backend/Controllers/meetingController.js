@@ -17,12 +17,11 @@ const createMeeting = async (req, res) => {
 
     // Verify workspace exists and user owns it
     const workspace = await Workspace.findById(workspaceId);
-    const owner = await User.findById(workspace.owner);
     if (!workspace) {
       return res.status(404).json({ message: "Workspace not found" });
     }
 
-    if (workspace.owner.toString() !== owner._id.toString()) {
+    if (workspace.owner.toString() !== req.user.id.toString()) {
       return res.status(403).json({ message: "Only workspace owner can create meetings in this workspace" });
     }
 
@@ -126,8 +125,10 @@ const updateMeeting = async (req, res) => {
 
     // Verify user has permission to update meeting in workspace
     const workspace = await Workspace.findById(meeting.workspace);
-       const owner = await User.findById(workspace.owner);
-      if (workspace.owner.toString() !== owner._id.toString()) {
+    if (!workspace) {
+      return res.status(404).json({ message: "Workspace not found" });
+    }
+    if (workspace.owner.toString() !== req.user.id.toString()) {
       return res.status(403).json({ message: "Only workspace owner can update this meeting" });
     }
 
@@ -182,8 +183,10 @@ const deleteMeeting = async (req, res) => {
 
     // Verify user has permission to delete meeting in workspace
     const workspace = await Workspace.findById(meeting.workspace);
-    const owner = await User.findById(workspace.owner);
-    if (workspace.owner.toString() !== owner._id.toString()) {
+    if (!workspace) {
+      return res.status(404).json({ message: "Workspace not found" });
+    }
+    if (workspace.owner.toString() !== req.user.id.toString()) {
       return res.status(403).json({ message: "Only workspace owner can delete this meeting" });
     }
 
@@ -233,6 +236,19 @@ const getMeetingById = async (req, res) => {
     if (!meeting) {
       return res.status(404).json({ message: "Meeting not found" });
     }
+
+    // Verify user belongs to the meeting's workspace
+    const workspace = await Workspace.findById(meeting.workspace);
+    if (!workspace) {
+      return res.status(404).json({ message: "Workspace not found" });
+    }
+    const userId = req.user.id.toString();
+    const isMember = workspace.owner.toString() === userId ||
+      workspace.members.some(m => m.userId.toString() === userId);
+    if (!isMember) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
     return res.status(200).json({ meeting });
   } catch (error) {
     console.error(error);
@@ -242,7 +258,18 @@ const getMeetingById = async (req, res) => {
 
 const getMeetings = async (req, res) => {
   try {
-    const meetings = await Meeting.find();
+    const userId = req.user.id;
+
+    // Find all workspaces where the user is owner or a member
+    const userWorkspaces = await Workspace.find({
+      $or: [
+        { owner: userId },
+        { "members.userId": userId },
+      ],
+    }).select("_id");
+
+    const workspaceIds = userWorkspaces.map(w => w._id);
+    const meetings = await Meeting.find({ workspace: { $in: workspaceIds } });
     return res.status(200).json({ meetings });
   } catch (error) {
     console.error(error);

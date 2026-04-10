@@ -5,7 +5,9 @@
       "Bash(venv/Scripts/pip install:*)",
       "Bash(venv/Scripts/python -c \"import motor; import pymongo; print\\('motor:', motor.version\\); print\\('pymongo:', pymongo.version\\)\")",
       "Bash(venv/Scripts/python -c ':*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(xargs grep:*)",
+      "Bash(grep -E \"\\\\.js$\")"
     ]
   }
 }

@@ -47,6 +47,11 @@ export const AuthProvider = ({ children }) => {
     setError(errorMessage);
   }, []);
 
+  const updateUser = useCallback((userData) => {
+    setUser(userData);
+    localStorage.setItem("meetra_user", JSON.stringify(userData));
+  }, []);
+
   const value = {
     user,
     token,
@@ -55,6 +60,7 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     setAuthError,
+    updateUser,
     isAuthenticated: !!token,
   };
 

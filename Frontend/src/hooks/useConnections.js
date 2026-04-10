@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import * as connectionService from '../services/connectionService';
 
 export const useConnections = () => {
@@ -34,8 +35,10 @@ export const useConnections = () => {
     try {
       await connectionService.sendRequest(userId);
       await fetchAll();
+      toast.success('Connection request sent');
     } catch (err) {
       console.error(err);
+      toast.error(err.response?.data?.message || 'Failed to send request');
       throw err;
     }
   };
@@ -44,8 +47,10 @@ export const useConnections = () => {
     try {
       await connectionService.acceptRequest(userId);
       await fetchAll();
+      toast.success('Connection accepted');
     } catch (err) {
       console.error(err);
+      toast.error(err.response?.data?.message || 'Failed to accept request');
       throw err;
     }
   };
@@ -54,8 +59,10 @@ export const useConnections = () => {
     try {
       await connectionService.rejectRequest(userId);
       await fetchAll();
+      toast.success('Request declined');
     } catch (err) {
       console.error(err);
+      toast.error(err.response?.data?.message || 'Failed to decline request');
       throw err;
     }
   };
@@ -64,8 +71,10 @@ export const useConnections = () => {
     try {
       await connectionService.removeConnection(userId);
       await fetchAll();
+      toast.success('Connection removed');
     } catch (err) {
       console.error(err);
+      toast.error(err.response?.data?.message || 'Failed to remove connection');
       throw err;
     }
   };

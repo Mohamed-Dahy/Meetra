@@ -28,6 +28,14 @@ app.use('/meetra/api/transcription', transcriptionRoutes);
 app.use('/meetra/api/export', exportPDFRoutes);
 app.use('/meetra/connections',connectionRoutes)
 app.use('/meetra/workspaces',workspaceRoutes)
+
+// Global error handler — catches any unhandled errors thrown in route handlers
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({ message: err.message || 'Internal server error' });
+});
+
 const PORT = process.env.PORT;
 
 app.listen(PORT, () => {

@@ -129,6 +129,7 @@ export default function MeetraAuthPage() {
   const [mode, setMode] = useState("login");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isRateLimited, setIsRateLimited] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [loginData, setLoginData] = useState({ email:"", password:"" });
   const [signupData, setSignupData] = useState({ name:"", email:"", password:"", dateOfBirth:"", gender:"male", bio:"", interests:"" });
@@ -136,27 +137,37 @@ export default function MeetraAuthPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const switchMode = (m) => { setError(""); setMode(m); };
+  const switchMode = (m) => { setError(""); setIsRateLimited(false); setMode(m); };
   const isLogin = mode === "login";
 
+  const handleAuthError = (err) => {
+    if (err.response?.status === 429) {
+      setIsRateLimited(true);
+      setError(err.response?.data?.message || "Too many attempts, please try again after 15 minutes");
+    } else {
+      setIsRateLimited(false);
+      setError(err.response?.data?.message || (isLogin ? "Login failed. Please try again." : "Signup failed. Please try again."));
+    }
+  };
+
   const handleLogin = async (e) => {
-    e.preventDefault(); setError(""); setIsLoading(true);
+    e.preventDefault(); setError(""); setIsRateLimited(false); setIsLoading(true);
     try {
       const { data } = await api.post("/auth/login", { email:loginData.email, password:loginData.password });
       login(data.user, data.token); navigate("/dashboard");
-    } catch(err) { setError(err.response?.data?.message || "Login failed. Please try again."); }
+    } catch(err) { handleAuthError(err); }
     finally { setIsLoading(false); }
   };
 
   const handleSignup = async (e) => {
-    e.preventDefault(); setError(""); setIsLoading(true);
+    e.preventDefault(); setError(""); setIsRateLimited(false); setIsLoading(true);
     try {
       const payload = { name:signupData.name, email:signupData.email, password:signupData.password, dateOfBirth:signupData.dateOfBirth, gender:signupData.gender };
       if(signupData.bio) payload.bio = signupData.bio;
       if(signupData.interests) payload.interests = signupData.interests;
       const { data } = await api.post("/auth/register", payload);
       login(data.user, data.token); navigate("/dashboard");
-    } catch(err) { setError(err.response?.data?.message || "Signup failed. Please try again."); }
+    } catch(err) { handleAuthError(err); }
     finally { setIsLoading(false); }
   };
 
@@ -243,9 +254,23 @@ export default function MeetraAuthPage() {
 
               <AnimatePresence>
                 {error && (
-                  <motion.div initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} exit={{opacity:0}} className="err-box">
-                    <AlertCircle size={16} style={{color:"#f87171",flexShrink:0,marginTop:1}}/>
-                    <span style={{fontSize:13,color:"#f87171"}}>{error}</span>
+                  <motion.div
+                    initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} exit={{opacity:0}}
+                    style={{
+                      background: isRateLimited ? "rgba(245,158,11,0.08)" : "rgba(239,68,68,0.08)",
+                      border: `1px solid ${isRateLimited ? "rgba(245,158,11,0.25)" : "rgba(239,68,68,0.2)"}`,
+                      borderRadius:11, padding:"12px 14px", display:"flex", gap:10, marginBottom:20, alignItems:"flex-start",
+                    }}
+                  >
+                    <AlertCircle size={16} style={{color: isRateLimited ? "#fbbf24" : "#f87171", flexShrink:0, marginTop:1}}/>
+                    <div>
+                      <span style={{fontSize:13, color: isRateLimited ? "#fbbf24" : "#f87171"}}>{error}</span>
+                      {isRateLimited && (
+                        <div style={{fontSize:11,color:"rgba(251,191,36,0.6)",marginTop:4}}>
+                          Please wait before trying again.
+                        </div>
+                      )}
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -319,7 +344,7 @@ export default function MeetraAuthPage() {
                   </div>
                 </div>
 
-                <button type="submit" className="submit-btn" disabled={isLoading}>
+                <button type="submit" className="submit-btn" disabled={isLoading || isRateLimited}>
                   {isLoading
                     ? <><div className="spin"/>{isLogin?"Signing in...":"Creating account..."}</>
                     : isLogin?"Sign in to Meetra →":"Create account →"

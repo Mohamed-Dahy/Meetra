@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import * as meetingService from '../services/meetingService';
 
 export const useMeetings = () => {
@@ -26,8 +27,10 @@ export const useMeetings = () => {
     try {
       await meetingService.createMeeting(data);
       await fetchMeetings();
+      toast.success('Meeting created successfully');
     } catch (err) {
       console.error(err);
+      toast.error(err.response?.data?.message || 'Failed to create meeting');
       throw err;
     }
   };
@@ -36,8 +39,10 @@ export const useMeetings = () => {
     try {
       await meetingService.updateMeeting(id, data);
       await fetchMeetings();
+      toast.success('Meeting updated successfully');
     } catch (err) {
       console.error(err);
+      toast.error(err.response?.data?.message || 'Failed to update meeting');
       throw err;
     }
   };
@@ -46,8 +51,10 @@ export const useMeetings = () => {
     try {
       await meetingService.deleteMeeting(id);
       await fetchMeetings();
+      toast.success('Meeting deleted');
     } catch (err) {
       console.error(err);
+      toast.error(err.response?.data?.message || 'Failed to delete meeting');
       throw err;
     }
   };

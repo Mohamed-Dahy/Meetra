@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import * as workspaceService from '../services/workspaceService';
 
 export const useWorkspaces = () => {
@@ -26,8 +27,10 @@ export const useWorkspaces = () => {
     try {
       await workspaceService.createWorkspace(data);
       await fetchWorkspaces();
+      toast.success('Workspace created successfully');
     } catch (err) {
       console.error(err);
+      toast.error(err.response?.data?.message || 'Failed to create workspace');
       throw err;
     }
   };
@@ -36,8 +39,10 @@ export const useWorkspaces = () => {
     try {
       await workspaceService.updateWorkspace(id, data);
       await fetchWorkspaces();
+      toast.success('Workspace updated successfully');
     } catch (err) {
       console.error(err);
+      toast.error(err.response?.data?.message || 'Failed to update workspace');
       throw err;
     }
   };
@@ -46,8 +51,10 @@ export const useWorkspaces = () => {
     try {
       await workspaceService.deleteWorkspace(id);
       await fetchWorkspaces();
+      toast.success('Workspace deleted');
     } catch (err) {
       console.error(err);
+      toast.error(err.response?.data?.message || 'Failed to delete workspace');
       throw err;
     }
   };
@@ -56,8 +63,10 @@ export const useWorkspaces = () => {
     try {
       await workspaceService.inviteMember(workspaceId, userId);
       await fetchWorkspaces();
+      toast.success('Member invited successfully');
     } catch (err) {
       console.error(err);
+      toast.error(err.response?.data?.message || 'Failed to invite member');
       throw err;
     }
   };
@@ -66,8 +75,10 @@ export const useWorkspaces = () => {
     try {
       await workspaceService.removeMember(workspaceId, userId);
       await fetchWorkspaces();
+      toast.success('Member removed');
     } catch (err) {
       console.error(err);
+      toast.error(err.response?.data?.message || 'Failed to remove member');
       throw err;
     }
   };
@@ -76,8 +87,10 @@ export const useWorkspaces = () => {
     try {
       await workspaceService.leaveWorkspace(id);
       await fetchWorkspaces();
+      toast.success('Left workspace');
     } catch (err) {
       console.error(err);
+      toast.error(err.response?.data?.message || 'Failed to leave workspace');
       throw err;
     }
   };
