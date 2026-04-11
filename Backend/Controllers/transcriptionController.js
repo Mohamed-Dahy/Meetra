@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const genAI = require("../config/gemini");
-const Meeting = require("../Models/meetingmodel");
+const Meeting = require("../Models/meetingModel");
 const Workspace = require("../Models/workspaceModel");
 const User = require("../Models/userModel");
 

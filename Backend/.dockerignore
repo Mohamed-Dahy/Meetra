@@ -1,0 +1,17 @@
+# Dependencies — installed fresh inside the container by npm ci
+node_modules
+
+# Environment secrets — never bake secrets into an image layer
+.env
+
+# Runtime-generated directories — mounted as Docker named volumes instead
+uploads
+pdfs
+
+# Git metadata — not needed inside the container
+.git
+.gitignore
+
+# Logs
+*.log
+npm-debug.log*

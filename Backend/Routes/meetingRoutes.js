@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const MeetingController = require('../Controllers/meetingcontroller');
+const MeetingController = require('../Controllers/meetingController');
 const { protect } = require('../middleware/authMiddleware');
 
 router.post('/create', protect, MeetingController.createMeeting); // done

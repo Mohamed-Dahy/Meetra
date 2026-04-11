@@ -1,7 +1,7 @@
 const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
-const Meeting = require("../Models/meetingmodel");
+const Meeting = require("../Models/meetingModel");
 const Workspace = require("../Models/workspaceModel");
 const User = require("../Models/userModel");
 

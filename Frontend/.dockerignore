@@ -1,0 +1,18 @@
+# Dependencies — installed fresh inside the container by npm ci
+node_modules
+
+# Previous build output — the container builds its own fresh dist/
+dist
+
+# Environment files — VITE_ vars are passed as build ARGs, not copied in
+.env
+.env.local
+.env.*.local
+
+# Git metadata
+.git
+.gitignore
+
+# Editor / OS noise
+.DS_Store
+*.log

@@ -1,4 +1,4 @@
-const Meeting = require("../Models/meetingmodel");
+const Meeting = require("../Models/meetingModel");
 const User = require("../Models/userModel");
 const Workspace = require("../Models/workspaceModel");
 const { sendEmail, analysisReadyEmail } = require("../config/email");

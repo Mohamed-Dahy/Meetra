@@ -8,3 +8,6 @@ __pycache__/
 
 CLAUDE.MD
 .claude/
+deployment_plan.md
+docker_plan.md
+Meetra.md

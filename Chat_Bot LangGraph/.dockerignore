@@ -1,0 +1,22 @@
+# Virtual environment — dependencies are installed fresh by pip inside the container
+venv
+.venv
+env
+
+# Environment secrets — passed via docker-compose env_file, never baked into the image
+.env
+
+# Python bytecode cache — excluded by PYTHONDONTWRITEBYTECODE but listed here
+# to also prevent them from being sent in the Docker build context
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Git metadata
+.git
+.gitignore
+
+# Editor / OS noise
+.DS_Store
+*.log
