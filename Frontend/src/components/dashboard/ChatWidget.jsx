@@ -250,7 +250,7 @@ const ChatWidget = () => {
 
   const handleSend = async () => {
     const text = input.trim();
-    if (!text || loading || !workspaceId || !user?._id) return;
+    if (!text || loading || !workspaceId) return;
 
     setInput('');
     setMessages(prev => [...prev, { role: 'user', text }]);
@@ -259,7 +259,6 @@ const ChatWidget = () => {
     try {
       const reply = await sendChatMessage({
         workspaceId,
-        userId: user._id,
         message: text,
       });
       setMessages(prev => [...prev, { role: 'ai', text: reply }]);
@@ -274,9 +273,9 @@ const ChatWidget = () => {
   };
 
   const handleClear = async () => {
-    if (!workspaceId || !user?._id) return;
+    if (!workspaceId) return;
     setMessages([]);
-    try { await clearChatSession({ workspaceId, userId: user._id }); } catch { /* silent */ }
+    try { await clearChatSession({ workspaceId }); } catch { /* silent */ }
   };
 
   const handleKeyDown = (e) => {

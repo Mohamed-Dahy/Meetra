@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const User = require("../Models/userModel");
 
 // ─── Send Connection Request ───────────────────────────────────────────────
@@ -36,11 +37,18 @@ const sendRequest = async (req, res) => {
 
     // Push to sentRequests of current user
     currentUser.sentRequests.push(userId);
-    await currentUser.save();
-
     // Push to receivedRequests of target user
     targetUser.receivedRequests.push(req.user.id);
-    await targetUser.save();
+
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        await currentUser.save({ session });
+        await targetUser.save({ session });
+      });
+    } finally {
+      await session.endSession();
+    }
 
     return res.status(200).json({ message: "Connection request sent successfully" });
   } catch (error) {
@@ -78,9 +86,15 @@ const acceptRequest = async (req, res) => {
     currentUser.connections.push(userId);
     senderUser.connections.push(req.user.id);
 
-    // Save both
-    await currentUser.save();
-    await senderUser.save();
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        await currentUser.save({ session });
+        await senderUser.save({ session });
+      });
+    } finally {
+      await session.endSession();
+    }
 
     return res.status(200).json({ message: "Connection request accepted" });
   } catch (error) {
@@ -114,9 +128,15 @@ const rejectRequest = async (req, res) => {
     // Remove from sentRequests of sender
     senderUser.sentRequests.pull(req.user.id);
 
-    // Save both
-    await currentUser.save();
-    await senderUser.save();
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        await currentUser.save({ session });
+        await senderUser.save({ session });
+      });
+    } finally {
+      await session.endSession();
+    }
 
     return res.status(200).json({ message: "Connection request rejected" });
   } catch (error) {
@@ -146,8 +166,15 @@ const removeConnection = async (req, res) => {
     currentUser.connections.pull(userId);
     targetUser.connections.pull(req.user.id);
 
-    await currentUser.save();
-    await targetUser.save();
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        await currentUser.save({ session });
+        await targetUser.save({ session });
+      });
+    } finally {
+      await session.endSession();
+    }
 
     return res.status(200).json({ message: "Connection removed successfully" });
   } catch (error) {

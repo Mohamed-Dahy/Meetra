@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const morgan = require('morgan');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const authRoutes = require('./Routes/authRoutes');
@@ -13,8 +14,23 @@ dotenv.config();
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['http://localhost:5173', 'http://localhost'];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow server-to-server or same-origin requests (no Origin header)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS: origin ${origin} not allowed`));
+    }
+  },
+  credentials: true,
+}));
+app.use(morgan('dev'));
+app.use(express.json({ limit: '10kb' }));
 
 connectDB();
 

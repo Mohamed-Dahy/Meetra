@@ -3,95 +3,93 @@ const path = require("path");
 const genAI = require("../config/gemini");
 const Meeting = require("../Models/meetingModel");
 const Workspace = require("../Models/workspaceModel");
-const User = require("../Models/userModel");
+
+// Rejects after `ms` milliseconds — used to cap the Gemini API call so a
+// large audio file can't hang the server indefinitely.
+const withTimeout = (promise, ms) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Operation timed out after ${ms / 1000}s`)), ms)
+    ),
+  ]);
+
+// Deletes a file and logs if it fails — never throws.
+const safeUnlink = (filePath) => {
+  fs.unlink(filePath, (err) => {
+    if (err) console.error("Failed to delete uploaded file:", filePath, err.message);
+  });
+};
+
+// Checks that the requesting user is the workspace owner OR the meeting creator.
+const checkTranscriptionPermission = (workspace, meeting, userId) => {
+  const uid = userId.toString();
+  return (
+    workspace.owner.toString() === uid ||
+    meeting.createdBy.toString() === uid
+  );
+};
 
 const transcribeAudio = async (req, res) => {
   try {
     const { meetingId } = req.body;
 
     if (!meetingId) {
-      return res.status(400).json({
-        success: false,
-        message: "meetingId is required",
-      });
+      return res.status(400).json({ success: false, message: "meetingId is required" });
     }
 
     if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: "Audio file is required",
-      });
+      return res.status(400).json({ success: false, message: "Audio file is required" });
     }
 
-    // Fetch meeting
     const meeting = await Meeting.findById(meetingId);
     if (!meeting) {
-      return res.status(404).json({
-        success: false,
-        message: "Meeting not found",
-      });
+      safeUnlink(req.file.path);
+      return res.status(404).json({ success: false, message: "Meeting not found" });
     }
 
-    // === Workspace & Permission Validation (Same as createMeeting) ===
     const workspace = await Workspace.findById(meeting.workspace);
     if (!workspace) {
-      return res.status(404).json({
-        success: false,
-        message: "Workspace not found",
-      });
+      safeUnlink(req.file.path);
+      return res.status(404).json({ success: false, message: "Workspace not found" });
     }
 
-    // Only workspace owner OR meeting creator can transcribe
-    const owner = await User.findById(workspace.owner);
-    if (workspace.owner.toString() !==  owner._id.toString() && 
-        meeting.createdBy.toString() !==  owner._id.toString()) {
+    if (!checkTranscriptionPermission(workspace, meeting, req.user.id)) {
+      safeUnlink(req.file.path);
       return res.status(403).json({
         success: false,
-        message: "Only workspace owner or meeting creator can transcribe this meeting",
+        message: "Only the workspace owner or meeting creator can transcribe this meeting",
       });
     }
 
-    // Optional: Check if user is a participant (recommended for security)
-    const isParticipant = meeting.participants.some(
-      (p) => p.toString() === owner._id.toString()
-    );
-    if (!isParticipant && workspace.owner.toString() !== owner._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: "You must be a participant or owner to transcribe this meeting",
-      });
-    }
-
-    // Mark as processing
     meeting.status = "processing";
     await meeting.save();
 
     const filePath = req.file.path;
-    const fileBuffer = fs.readFileSync(filePath);
+
+    // Non-blocking async read — does not stall the event loop
+    const fileBuffer = await fs.promises.readFile(filePath);
     const audioBase64 = fileBuffer.toString("base64");
     const mimeType = req.file.mimetype || "audio/mp4";
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          data: audioBase64,
-          mimeType,
-        },
-      },
-      { text: "Transcribe this meeting audio as plain text. Be accurate and keep speaker labels if possible." },
-    ]);
+    // Cap at 3 minutes — prevents a single large upload from hanging the server
+    const result = await withTimeout(
+      model.generateContent([
+        { inlineData: { data: audioBase64, mimeType } },
+        { text: "Transcribe this meeting audio as plain text. Be accurate and keep speaker labels if possible." },
+      ]),
+      180_000
+    );
 
     const transcriptText = result?.response?.text() || "";
 
-    // Save transcript
     meeting.transcript = transcriptText;
-    meeting.status = "completed";   // Changed from "processing" to "completed"
+    meeting.status = "completed";
     await meeting.save();
 
-    // Clean up uploaded file
-    fs.unlink(filePath, () => {});
+    safeUnlink(filePath);
 
     return res.status(200).json({
       success: true,
@@ -102,14 +100,12 @@ const transcribeAudio = async (req, res) => {
   } catch (error) {
     console.error("Error in transcribeAudio:", error);
 
-    // Cleanup file even on error
-    if (req.file && req.file.path) {
-      fs.unlink(req.file.path, () => {});
-    }
+    if (req.file?.path) safeUnlink(req.file.path);
 
-    return res.status(500).json({
+    const isTimeout = error.message?.includes("timed out");
+    return res.status(isTimeout ? 504 : 500).json({
       success: false,
-      message: "Failed to transcribe audio",
+      message: isTimeout ? "Transcription timed out — try a shorter audio file" : "Failed to transcribe audio",
     });
   }
 };
@@ -119,55 +115,30 @@ const transcribeText = async (req, res) => {
     const { meetingId, text } = req.body;
 
     if (!meetingId) {
-      return res.status(400).json({
-        success: false,
-        message: "meetingId is required",
-      });
+      return res.status(400).json({ success: false, message: "meetingId is required" });
     }
 
     if (!text || !text.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Transcript text is required and cannot be empty",
-      });
+      return res.status(400).json({ success: false, message: "Transcript text is required and cannot be empty" });
     }
 
     const meeting = await Meeting.findById(meetingId);
     if (!meeting) {
-      return res.status(404).json({
-        success: false,
-        message: "Meeting not found",
-      });
+      return res.status(404).json({ success: false, message: "Meeting not found" });
     }
 
-    // === Same Workspace & Permission Validation ===
     const workspace = await Workspace.findById(meeting.workspace);
     if (!workspace) {
-      return res.status(404).json({
-        success: false,
-        message: "Workspace not found",
-      });
+      return res.status(404).json({ success: false, message: "Workspace not found" });
     }
-    const owner = await User.findById(workspace.owner);
-    if (workspace.owner.toString() !== owner._id.toString() && 
-        meeting.createdBy.toString() !== owner._id.toString()) {
+
+    if (!checkTranscriptionPermission(workspace, meeting, req.user.id)) {
       return res.status(403).json({
         success: false,
-        message: "Only workspace owner or meeting creator can add transcript to this meeting",
+        message: "Only the workspace owner or meeting creator can add a transcript to this meeting",
       });
     }
 
-    const isParticipant = meeting.participants.some(
-      (p) => p.toString() === owner._id.toString()
-    );
-    if (!isParticipant && workspace.owner.toString() !== owner._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: "You must be a participant or owner to add transcript",
-      });
-    }
-
-    // Save manual transcript
     meeting.transcript = text.trim();
     meeting.status = "completed";
     await meeting.save();
@@ -180,10 +151,7 @@ const transcribeText = async (req, res) => {
     });
   } catch (error) {
     console.error("Error in transcribeText:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to save transcript",
-    });
+    return res.status(500).json({ success: false, message: "Failed to save transcript" });
   }
 };
 
@@ -218,7 +186,8 @@ Return ONLY valid JSON with no markdown, no code blocks, no extra text.
 Transcript:
 ${meeting.transcript}`;
 
-    const result = await model.generateContent(prompt);
+    // Cap at 60 seconds for analysis
+    const result = await withTimeout(model.generateContent(prompt), 60_000);
     const rawText = result?.response?.text() || "";
 
     let analysis;
@@ -255,12 +224,12 @@ ${meeting.transcript}`;
     });
   } catch (error) {
     console.error("Error in analyzeMeeting:", error);
-    return res.status(500).json({ success: false, message: "Failed to analyze meeting" });
+    const isTimeout = error.message?.includes("timed out");
+    return res.status(isTimeout ? 504 : 500).json({
+      success: false,
+      message: isTimeout ? "Analysis timed out — try again" : "Failed to analyze meeting",
+    });
   }
 };
 
-module.exports = {
-  transcribeAudio,
-  transcribeText,
-  analyzeMeeting,
-};
+module.exports = { transcribeAudio, transcribeText, analyzeMeeting };
