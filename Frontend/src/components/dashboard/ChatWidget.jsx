@@ -213,6 +213,36 @@ function EmptyState() {
   );
 }
 
+/* ── localStorage helpers ── */
+// Messages are stored per user+workspace so switching workspaces or users
+// shows the correct history. Key format: meetra_chat_{userId}_{workspaceId}
+const loadMessages = (userId, wsId) => {
+  if (!userId || !wsId) return [];
+  try {
+    const raw = localStorage.getItem(`meetra_chat_${userId}_${wsId}`);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+};
+
+const saveMessages = (userId, wsId, msgs) => {
+  if (!userId || !wsId) return;
+  try {
+    // Keep only the last 100 messages to avoid bloating localStorage
+    localStorage.setItem(`meetra_chat_${userId}_${wsId}`, JSON.stringify(msgs.slice(-100)));
+  } catch { /* storage full — fail silently */ }
+};
+
+// Remember which workspace the user last chatted in, per user account
+const loadLastWorkspace = (userId) => {
+  if (!userId) return '';
+  return localStorage.getItem(`meetra_last_workspace_${userId}`) || '';
+};
+
+const saveLastWorkspace = (userId, wsId) => {
+  if (!userId || !wsId) return;
+  localStorage.setItem(`meetra_last_workspace_${userId}`, wsId);
+};
+
 /* ── Main ChatWidget ── */
 const ChatWidget = () => {
   const [open, setOpen] = useState(false);
@@ -226,12 +256,28 @@ const ChatWidget = () => {
   const messagesRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Auto-select first workspace
+  // Restore last selected workspace, falling back to the first workspace.
+  // Runs once workspaces are loaded — picks the remembered id if it still
+  // exists in the list, otherwise falls back to the first workspace.
   useEffect(() => {
-    if (workspaces.length > 0 && !workspaceId) {
-      setWorkspaceId(workspaces[0]._id);
-    }
-  }, [workspaces, workspaceId]);
+    if (workspaces.length === 0 || workspaceId) return;
+    const last = loadLastWorkspace(user?._id);
+    const exists = workspaces.find(w => w._id === last);
+    const resolved = exists ? last : workspaces[0]._id;
+    setWorkspaceId(resolved);
+  }, [workspaces, user, workspaceId]);
+
+  // Load persisted messages whenever the active workspace changes
+  useEffect(() => {
+    if (!workspaceId || !user?._id) return;
+    setMessages(loadMessages(user._id, workspaceId));
+  }, [workspaceId, user?._id]);
+
+  // Persist messages to localStorage on every change
+  useEffect(() => {
+    if (!workspaceId || !user?._id) return;
+    saveMessages(user._id, workspaceId, messages);
+  }, [messages, workspaceId, user?._id]);
 
   // Scroll to bottom whenever messages change
   useEffect(() => { scrollToBottom(messagesRef); }, [messages, loading]);
@@ -242,16 +288,19 @@ const ChatWidget = () => {
   }, [open]);
 
   const handleWorkspaceChange = (id) => {
-    if (id !== workspaceId) {
-      setWorkspaceId(id);
-      setMessages([]);
-    }
+    if (id === workspaceId) return;
+    // Save current messages before switching, then load the new workspace's history
+    saveMessages(user?._id, workspaceId, messages);
+    saveLastWorkspace(user?._id, id);
+    setWorkspaceId(id);
+    // messages will be loaded by the workspaceId useEffect above
   };
 
   const handleSend = async () => {
     const text = input.trim();
     if (!text || loading || !workspaceId) return;
 
+    saveLastWorkspace(user?._id, workspaceId);
     setInput('');
     setMessages(prev => [...prev, { role: 'user', text }]);
     setLoading(true);

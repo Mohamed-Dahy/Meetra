@@ -63,24 +63,33 @@ const ConnectionsTab = () => {
   } = useConnections();
 
   const [allUsers, setAllUsers] = useState([]);
-  const [usersLoading, setUsersLoading] = useState(true);
+  const [usersLoading, setUsersLoading] = useState(false);
   const [query, setQuery] = useState('');
   const [actionLoading, setActionLoading] = useState({});
 
+  // Debounced search — only fires a request after the user stops typing for
+  // 400ms and has typed at least 2 characters. This replaces the old approach
+  // of loading ALL users on mount, which becomes a problem as the user base grows.
   useEffect(() => {
-    const fetchUsers = async () => {
+    if (query.length < 2) {
+      setAllUsers([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
       setUsersLoading(true);
       try {
-        const res = await api.get('/auth/users');
+        // Pass search query and a page size limit to the backend.
+        // Backend returns up to 20 matches — enough for the UI panel.
+        const res = await api.get(`/auth/users?search=${encodeURIComponent(query)}&limit=20`);
         setAllUsers(res.data.users || res.data.data || res.data || []);
       } catch (err) {
         console.error(err);
       } finally {
         setUsersLoading(false);
       }
-    };
-    fetchUsers();
-  }, []);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const withLoading = async (id, fn) => {
     setActionLoading(s => ({ ...s, [id]: true }));
@@ -209,10 +218,12 @@ const ConnectionsTab = () => {
             />
           </div>
 
-          {usersLoading ? (
-            <div style={{ color: T.muted2, fontSize: 12, textAlign: 'center', padding: '20px 0' }}>Loading users…</div>
+          {query.length < 2 ? (
+            <EmptyState msg="Type at least 2 characters to search" />
+          ) : usersLoading ? (
+            <div style={{ color: T.muted2, fontSize: 12, textAlign: 'center', padding: '20px 0' }}>Searching…</div>
           ) : filteredUsers.length === 0 ? (
-            <EmptyState msg={query ? 'No users found' : 'No new people to connect with'} />
+            <EmptyState msg="No users found" />
           ) : filteredUsers.map(u => {
             const isPending = sentIds.has(u._id);
             return (

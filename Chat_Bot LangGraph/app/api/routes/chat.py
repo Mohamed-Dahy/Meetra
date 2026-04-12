@@ -1,3 +1,6 @@
+import time
+from collections import defaultdict
+
 from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage, messages_from_dict, messages_to_dict
@@ -12,6 +15,37 @@ router = APIRouter()
 # Persistent session store — one document per user:workspace pair.
 # Collection: { _id: "user_id:workspace_id", messages: [...serialized...] }
 _sessions = db["chat_sessions"]
+
+# ---------------------------------------------------------------------------
+# Sliding-window size: only the last N messages are sent to the LLM.
+# Older messages stay in MongoDB for history display but don't inflate the
+# context window or token cost on every turn.
+# ---------------------------------------------------------------------------
+_WINDOW = 20
+
+# ---------------------------------------------------------------------------
+# Simple in-memory rate limiter: max 20 /chat requests per user per minute.
+# Stored as a sliding list of timestamps, pruned on each request.
+# Works for single-instance deployment (Docker, Render free tier, etc.).
+# For multi-instance deployments replace with Redis-backed slowapi.
+# ---------------------------------------------------------------------------
+_RATE_LIMIT = 20          # max requests
+_RATE_WINDOW = 60         # seconds
+_rate_store: dict[str, list[float]] = defaultdict(list)
+
+
+def _check_rate_limit(user_id: str) -> None:
+    """Raise 429 if the user has exceeded the rate limit."""
+    now = time.monotonic()
+    timestamps = _rate_store[user_id]
+    # Drop timestamps outside the rolling window
+    _rate_store[user_id] = [t for t in timestamps if now - t < _RATE_WINDOW]
+    if len(_rate_store[user_id]) >= _RATE_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many requests — max {_RATE_LIMIT} per {_RATE_WINDOW}s",
+        )
+    _rate_store[user_id].append(now)
 
 
 class ChatRequest(BaseModel):
@@ -59,22 +93,36 @@ async def get_current_user(authorization: str = Header(...)) -> str:
 
 @router.post("/chat")
 async def chat(req: ChatRequest, user_id: str = Depends(get_current_user)):
+    # Enforce per-user rate limit before doing any work
+    _check_rate_limit(user_id)
+
     key = _session_key(user_id, req.workspace_id)
 
-    # Load conversation history from MongoDB
+    # Load full conversation history from MongoDB
     doc = await _sessions.find_one({"_id": key})
     history = messages_from_dict(doc["messages"]) if doc else []
 
+    # Append the new user message to the full history
     all_messages = history + [HumanMessage(content=req.message)]
 
+    # Sliding window: pass only the last _WINDOW messages to the LLM so that
+    # token cost stays constant as conversations grow. The full history is still
+    # persisted to MongoDB below so nothing is lost.
+    windowed = all_messages[-_WINDOW:]
+
     result = await chatbot.ainvoke({
-        "messages": all_messages,
+        "messages": windowed,
         "workspace_id": req.workspace_id,
         "user_id": user_id,
     })
 
-    # Persist updated history back to MongoDB
-    serialized = messages_to_dict(result["messages"])
+    # The graph returns only the windowed messages + its replies.
+    # Reconstruct full history: everything before the window + graph output.
+    pre_window = all_messages[:-_WINDOW] if len(all_messages) > _WINDOW else []
+    full_history = pre_window + result["messages"]
+
+    # Persist updated full history back to MongoDB
+    serialized = messages_to_dict(full_history)
     await _sessions.replace_one(
         {"_id": key},
         {"_id": key, "messages": serialized},

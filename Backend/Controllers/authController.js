@@ -47,12 +47,26 @@ const loginUser = async (req, res) => {
 };
 
 
-const getUsers = async (req,res)=>{
+const getUsers = async (req, res) => {
   try {
-    const users = await User.find().select("-password");
-    res.status(200).json(users);
+    const { search = '', limit = 20 } = req.query;
+    const cap = Math.min(parseInt(limit, 10) || 20, 50); // hard cap at 50
+
+    // Build query — if search is provided, match name or email case-insensitively.
+    // Using a regex on indexed fields is acceptable for small-to-medium user bases.
+    const filter = search.trim()
+      ? {
+          $or: [
+            { name:  { $regex: search.trim(), $options: 'i' } },
+            { email: { $regex: search.trim(), $options: 'i' } },
+          ],
+        }
+      : {};
+
+    const users = await User.find(filter).select("-password").limit(cap);
+    res.status(200).json({ users });
   } catch (err) {
-      res.status(500).json({ message: "Failed to fetch users" });
+    res.status(500).json({ message: "Failed to fetch users" });
   }
 };
 

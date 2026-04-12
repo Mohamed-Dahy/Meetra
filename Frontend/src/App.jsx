@@ -8,6 +8,7 @@ import LandingPage from "./pages/LandingPage";
 import MeetraAuthPage from "./pages/MeetraAuthPage";
 import Dashboard from "./pages/Dashboard";
 import SettingsPage from "./pages/SettingsPage";
+import NotFoundPage from "./pages/NotFoundPage";
 
 /**
  * Navbar is only shown on public / marketing pages.
@@ -46,8 +47,9 @@ function AppShell() {
           }
         />
 
-        {/* ── Catch-all ── */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* ── 404 — shows a proper not-found page instead of silently
+              redirecting to / which hides broken links ── */}
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </>
   );

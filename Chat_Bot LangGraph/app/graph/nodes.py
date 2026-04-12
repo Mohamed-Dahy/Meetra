@@ -1,5 +1,11 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+)
 
 from app.core.config import settings
 from app.tools.meeting_tools import (
@@ -19,6 +25,21 @@ llm = ChatGoogleGenerativeAI(
 tools = [get_meetings, get_action_items, search_meetings, get_meeting_details,
          get_upcoming_meetings, get_workspace_stats]
 llm_with_tools = llm.bind_tools(tools)
+
+
+@retry(
+    # Up to 3 total attempts (1 initial + 2 retries)
+    stop=stop_after_attempt(3),
+    # Exponential back-off: 2 s → 4 s → 8 s (capped at 10 s)
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    # Retry on any exception — catches rate-limit (429), transient 5xx, timeouts
+    retry=retry_if_exception_type(Exception),
+    # Re-raise the last exception if all retries are exhausted
+    reraise=True,
+)
+async def _invoke_llm(messages: list):
+    """Call the LLM with tool bindings, retrying on transient Gemini errors."""
+    return await llm_with_tools.ainvoke(messages)
 
 SYSTEM_PROMPT = """You are Meetra AI — an intelligent workspace assistant built into the Meetra \
 meeting intelligence platform.
@@ -56,5 +77,5 @@ Behavioral rules:
 
 async def agent_node(state):
     system = SystemMessage(content=SYSTEM_PROMPT)
-    response = await llm_with_tools.ainvoke([system] + state["messages"])
+    response = await _invoke_llm([system] + state["messages"])
     return {"messages": [response]}

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Bell, Search, Plus, BarChart3, Users } from 'lucide-react';
+import { Sparkles, Bell, Search, Plus, BarChart3, Users, Clock, Calendar } from 'lucide-react';
 
 import Sidebar from '../components/layout/Sidebar';
 import { useAuth } from '../hooks/useAuth';
@@ -17,6 +17,8 @@ import EditMeetingModal from '../components/meetings/EditMeetingModal';
 import DeleteConfirmModal from '../components/meetings/DeleteConfirmModal';
 import TranscribeModal from '../components/meetings/TranscribeModal';
 import ChatWidget from '../components/dashboard/ChatWidget';
+import ErrorBoundary from '../components/ErrorBoundary';
+import TeamTab from '../components/dashboard/TeamTab';
 
 const T = {
   bg: '#04040c',
@@ -46,6 +48,17 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [search, setSearch] = useState('');
   const [searchFocused, setFocused] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef(null);
+
+  // Close notification panel when clicking outside
+  useEffect(() => {
+    const handler = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   // Meeting modals
   const [showCreateMeeting, setShowCreateMeeting] = useState(false);
@@ -88,40 +101,62 @@ const Dashboard = () => {
   };
 
   const renderTab = () => {
+    // Each tab is wrapped in ErrorBoundary — if one tab crashes, only that tab
+    // shows an error UI. The key={activeTab} resets the boundary when switching
+    // tabs so a previously crashed tab gets a fresh attempt on next visit.
     switch (activeTab) {
       case 'overview':
         return (
-          <OverviewTab
-            meetings={meetings}
-            loading={meetingsLoading}
-            onNewMeeting={openCreateMeeting}
-            setActiveTab={setActiveTab}
-          />
+          <ErrorBoundary key="overview">
+            <OverviewTab
+              meetings={meetings}
+              loading={meetingsLoading}
+              onNewMeeting={openCreateMeeting}
+              setActiveTab={setActiveTab}
+            />
+          </ErrorBoundary>
         );
       case 'meetings':
         return (
-          <MeetingsTab
-            meetings={meetings}
-            loading={meetingsLoading}
-            error={meetingsError}
-            onNew={openCreateMeeting}
-            onEdit={openEditMeeting}
-            onDelete={openDeleteMeeting}
-            onTranscribe={openTranscribeMeeting}
-          />
+          <ErrorBoundary key="meetings">
+            <MeetingsTab
+              meetings={meetings}
+              loading={meetingsLoading}
+              error={meetingsError}
+              onNew={openCreateMeeting}
+              onEdit={openEditMeeting}
+              onDelete={openDeleteMeeting}
+              onTranscribe={openTranscribeMeeting}
+              // Global search from topbar is forwarded here.
+              // MeetingsTab uses it as the initial query value.
+              externalQuery={search}
+            />
+          </ErrorBoundary>
         );
       case 'connections':
-        return <ConnectionsTab />;
+        return (
+          <ErrorBoundary key="connections">
+            <ConnectionsTab />
+          </ErrorBoundary>
+        );
       case 'workspaces':
         return (
-          <WorkspacesTab 
-            onCreateWorkspace={openCreateWorkspace}   // Pass open function if needed
-          />
+          <ErrorBoundary key="workspaces">
+            <WorkspacesTab onCreateWorkspace={openCreateWorkspace} />
+          </ErrorBoundary>
         );
       case 'analytics':
-        return <AnalyticsTab meetings={meetings} />;
+        return (
+          <ErrorBoundary key="analytics">
+            <AnalyticsTab meetings={meetings} />
+          </ErrorBoundary>
+        );
       case 'team':
-        return <ComingSoon label="Team" />;
+        return (
+          <ErrorBoundary key="team">
+            <TeamTab />
+          </ErrorBoundary>
+        );
       default:
         return null;
     }
@@ -198,7 +233,12 @@ const Dashboard = () => {
                 <Search size={13} style={{ color: T.muted2, flexShrink: 0 }} />
                 <input
                   value={search}
-                  onChange={e => setSearch(e.target.value)}
+                  onChange={e => {
+                    setSearch(e.target.value);
+                    // Auto-switch to meetings tab when the user starts typing
+                    // so the search results are immediately visible.
+                    if (e.target.value) setActiveTab('meetings');
+                  }}
                   onFocus={() => setFocused(true)}
                   onBlur={() => setFocused(false)}
                   placeholder="Search meetings, tasks…"
@@ -206,16 +246,76 @@ const Dashboard = () => {
                 />
               </div>
 
-              {/* Bell */}
-              <motion.button
-                whileTap={{ scale: 0.9 }}
-                style={{ width: 36, height: 36, borderRadius: 10, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.muted2, position: 'relative' }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.1)'; e.currentTarget.style.color = '#e2e8f0'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = T.muted2; }}
-              >
-                <Bell size={15} />
-                <span style={{ position: 'absolute', top: 7, right: 7, width: 6, height: 6, borderRadius: '50%', background: '#6366f1', boxShadow: '0 0 6px rgba(99,102,241,0.8)' }} />
-              </motion.button>
+              {/* Bell — shows upcoming meetings as notifications */}
+              <div ref={notifRef} style={{ position: 'relative' }}>
+                {(() => {
+                  const upcoming = meetings.filter(m => m.status === 'upcoming').slice(0, 10);
+                  return (
+                    <>
+                      <motion.button
+                        onClick={() => setNotifOpen(o => !o)}
+                        whileTap={{ scale: 0.9 }}
+                        style={{ width: 36, height: 36, borderRadius: 10, cursor: 'pointer', background: notifOpen ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.04)', border: `1px solid ${notifOpen ? 'rgba(99,102,241,0.35)' : 'rgba(255,255,255,0.07)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: notifOpen ? '#e2e8f0' : T.muted2, position: 'relative', transition: 'all 0.2s' }}
+                      >
+                        <Bell size={15} />
+                        {upcoming.length > 0 && (
+                          <span style={{ position: 'absolute', top: 6, right: 6, width: 7, height: 7, borderRadius: '50%', background: '#6366f1', boxShadow: '0 0 6px rgba(99,102,241,0.8)', border: '1.5px solid #04040c' }} />
+                        )}
+                      </motion.button>
+
+                      <AnimatePresence>
+                        {notifOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                            transition={{ duration: 0.18 }}
+                            style={{
+                              position: 'absolute', top: 'calc(100% + 10px)', right: 0, zIndex: 200,
+                              width: 300, background: '#0b0b18',
+                              border: '1px solid rgba(99,102,241,0.18)', borderRadius: 14,
+                              boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
+                              overflow: 'hidden',
+                            }}
+                          >
+                            <div style={{ padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <span style={{ fontFamily: "'Sora',sans-serif", fontSize: 13, fontWeight: 700, color: '#fff' }}>Upcoming Meetings</span>
+                              <span style={{ fontSize: 10, color: T.muted2, fontFamily: "'DM Sans',sans-serif" }}>{upcoming.length} scheduled</span>
+                            </div>
+                            <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+                              {upcoming.length === 0 ? (
+                                <div style={{ padding: '24px 16px', textAlign: 'center', color: T.muted2, fontSize: 12, fontFamily: "'DM Sans',sans-serif" }}>
+                                  <Calendar size={22} style={{ margin: '0 auto 8px', opacity: 0.3 }} />
+                                  No upcoming meetings
+                                </div>
+                              ) : upcoming.map((m, i) => (
+                                <div
+                                  key={m._id}
+                                  onClick={() => { setActiveTab('meetings'); setNotifOpen(false); }}
+                                  style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', borderBottom: i < upcoming.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', cursor: 'pointer', transition: 'background 0.15s' }}
+                                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.06)'; }}
+                                  onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
+                                >
+                                  <div style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                    <Clock size={12} style={{ color: '#fbbf24' }} />
+                                  </div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 2 }}>{m.title}</div>
+                                    <div style={{ fontSize: 11, color: T.muted2, fontFamily: "'DM Sans',sans-serif" }}>
+                                      {m.date ? new Date(m.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+                                      {m.time ? ` · ${m.time}` : ''}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </>
+                  );
+                })()}
+              </div>
 
               {/* New Meeting CTA */}
               <motion.button

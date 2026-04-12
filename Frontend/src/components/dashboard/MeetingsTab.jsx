@@ -44,14 +44,21 @@ const SkeletonRow = () => (
   </div>
 );
 
-const MeetingsTab = ({ meetings, loading, error, onNew, onEdit, onDelete, onTranscribe }) => {
+// externalQuery — optional string forwarded from the Dashboard topbar global search.
+// When the user types in the topbar, Dashboard switches to this tab and passes
+// the query here so results are immediately visible without re-typing.
+const MeetingsTab = ({ meetings, loading, error, onNew, onEdit, onDelete, onTranscribe, externalQuery = '' }) => {
   const [query, setQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
 
+  // Merge local query with external (topbar) query — external takes priority
+  // when it's non-empty so the topbar search drives the visible results.
+  const activeQuery = externalQuery || query;
+
   const filtered = meetings.filter(m =>
-    !query ||
-    m.title?.toLowerCase().includes(query.toLowerCase()) ||
-    m.location?.toLowerCase().includes(query.toLowerCase())
+    !activeQuery ||
+    m.title?.toLowerCase().includes(activeQuery.toLowerCase()) ||
+    m.location?.toLowerCase().includes(activeQuery.toLowerCase())
   );
 
   return (
@@ -80,7 +87,7 @@ const MeetingsTab = ({ meetings, loading, error, onNew, onEdit, onDelete, onTran
       }}>
         <Search size={13} style={{ color: T.muted2, flexShrink: 0 }} />
         <input
-          value={query} onChange={e => setQuery(e.target.value)}
+          value={activeQuery} onChange={e => setQuery(e.target.value)}
           onFocus={() => setSearchFocused(true)} onBlur={() => setSearchFocused(false)}
           placeholder="Search meetings…"
           style={{ background: 'none', border: 'none', outline: 'none', color: T.text, fontFamily: "'DM Sans',sans-serif", fontSize: 13, flex: 1 }}
@@ -102,9 +109,9 @@ const MeetingsTab = ({ meetings, loading, error, onNew, onEdit, onDelete, onTran
           <div style={{ textAlign: 'center', padding: '48px 0' }}>
             <Calendar size={32} style={{ color: 'rgba(99,102,241,0.3)', margin: '0 auto 14px' }} />
             <div style={{ fontSize: 15, fontWeight: 600, color: T.muted2, marginBottom: 8, fontFamily: "'Sora',sans-serif" }}>
-              {query ? 'No matching meetings' : 'No meetings yet'}
+              {activeQuery ? 'No matching meetings' : 'No meetings yet'}
             </div>
-            {!query && (
+            {!activeQuery && (
               <motion.button onClick={onNew} whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 9, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)', color: '#818cf8', fontFamily: "'DM Sans',sans-serif", fontSize: 13, cursor: 'pointer', marginTop: 4 }}
               >

@@ -8,8 +8,13 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Initialize from localStorage on mount
+  // Initialize from localStorage on mount.
+  // Safety timeout: if isLoading hasn't resolved in 5 seconds (e.g. a frozen
+  // effect, SSR mismatch, or future async work), force it to false so
+  // ProtectedRoute never shows a blank spinner permanently.
   useEffect(() => {
+    const timeout = setTimeout(() => setIsLoading(false), 5000);
+
     const storedToken = localStorage.getItem("meetra_token");
     const storedUser = localStorage.getItem("meetra_user");
 
@@ -25,6 +30,8 @@ export const AuthProvider = ({ children }) => {
     }
 
     setIsLoading(false);
+    clearTimeout(timeout);
+    return () => clearTimeout(timeout);
   }, []);
 
   const login = useCallback((userData, tokenData) => {

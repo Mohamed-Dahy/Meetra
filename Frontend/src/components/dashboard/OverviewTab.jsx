@@ -167,7 +167,11 @@ const OverviewTab = ({ meetings, loading, onNewMeeting, setActiveTab }) => {
           )}
         </motion.div>
 
-        {/* Pending actions — placeholder */}
+        {/* Pending Actions — pulled from actionItems[] on completed meetings.
+            The backend stores AI-generated action items on each meeting after
+            transcription. We flatten them across all meetings and show the
+            most recent 6. Empty state is shown when no meetings have been
+            transcribed yet. */}
         <motion.div
           variants={fadeUp} custom={5}
           style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 20, padding: 24 }}
@@ -175,16 +179,63 @@ const OverviewTab = ({ meetings, loading, onNewMeeting, setActiveTab }) => {
           <div style={{ fontFamily: "'Sora',sans-serif", fontSize: 15, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
             <CheckSquare size={14} style={{ color: '#8b5cf6' }} /> Pending Actions
           </div>
-          <div style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            padding: '36px 20px', borderRadius: 14,
-            background: 'rgba(99,102,241,0.04)', border: '1px dashed rgba(99,102,241,0.2)',
-            textAlign: 'center',
-          }}>
-            <BarChart3 size={28} style={{ color: 'rgba(99,102,241,0.4)', marginBottom: 12 }} />
-            <div style={{ fontSize: 13, fontWeight: 600, color: T.muted2, marginBottom: 6, fontFamily: "'Sora',sans-serif" }}>Coming soon</div>
-            <div style={{ fontSize: 12, color: T.muted, lineHeight: 1.5, fontFamily: "'DM Sans',sans-serif" }}>Connect Analysis Service to see AI-generated action items here</div>
-          </div>
+          {(() => {
+            // Collect all action items from meetings that have them,
+            // newest meetings first, capped at 6 items to fit the card.
+            const items = meetings
+              .filter(m => m.actionItems?.length > 0)
+              .slice()
+              .reverse()
+              .flatMap(m => m.actionItems.map(text => ({ text, meeting: m.title })))
+              .slice(0, 6);
+
+            if (items.length === 0) {
+              return (
+                <div style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  justifyContent: 'center', padding: '32px 20px', borderRadius: 14,
+                  background: 'rgba(99,102,241,0.04)', border: '1px dashed rgba(99,102,241,0.2)',
+                  textAlign: 'center',
+                }}>
+                  <CheckSquare size={26} style={{ color: 'rgba(139,92,246,0.35)', marginBottom: 10 }} />
+                  <div style={{ fontSize: 13, fontWeight: 600, color: T.muted2, marginBottom: 5, fontFamily: "'Sora',sans-serif" }}>No action items yet</div>
+                  <div style={{ fontSize: 12, color: T.muted, lineHeight: 1.5, fontFamily: "'DM Sans',sans-serif" }}>Transcribe a meeting to get AI-generated action items</div>
+                </div>
+              );
+            }
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {items.map((item, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: 8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.06 }}
+                    style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 10,
+                      padding: '9px 12px', borderRadius: 10,
+                      background: 'rgba(139,92,246,0.06)',
+                      border: '1px solid rgba(139,92,246,0.12)',
+                    }}
+                  >
+                    <div style={{
+                      width: 18, height: 18, borderRadius: 5, flexShrink: 0, marginTop: 1,
+                      border: '1.5px solid rgba(139,92,246,0.4)',
+                      background: 'rgba(139,92,246,0.08)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, color: T.text, lineHeight: 1.5, fontFamily: "'DM Sans',sans-serif" }}>{item.text}</div>
+                      <div style={{ fontSize: 10, color: T.muted, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {item.meeting}
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            );
+          })()}
         </motion.div>
       </div>
 
