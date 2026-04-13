@@ -45,6 +45,19 @@ services:
       - uploads_data:/app/uploads
       - pdfs_data:/app/pdfs
 
+    # Docker HEALTHCHECK — Docker pings GET /meetra/health every 30s.
+    # After 3 consecutive failures the container is marked "unhealthy" and
+    # Docker will restart it (combined with restart: unless-stopped).
+    # interval: how often to check | timeout: per-request deadline
+    # start_period: grace window after container starts (lets Node connect to Atlas)
+    # retries: failures before "unhealthy"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:5000/meetra/health',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
     # Restart the container automatically if it crashes.
     # "unless-stopped" means: always restart on crash, but respect a manual
     # "docker compose stop" — don't restart if you intentionally stopped it.
@@ -66,6 +79,13 @@ services:
     env_file:
       - .env
 
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
@@ -84,11 +104,18 @@ services:
       # real server/domain, change these to your actual public URLs before
       # running docker compose build.
       args:
-        VITE_API_BASE_URL: http://localhost:5000/meetra
+        VITE_API_BASE_URL: http://localhost:5000/meetra/v1
         VITE_CHATBOT_URL: http://localhost:8000
 
     ports:
       - "80:80"
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
 
     # depends_on ensures backend and chatbot containers are started before
     # the frontend container starts. Note: this only guarantees start ORDER,

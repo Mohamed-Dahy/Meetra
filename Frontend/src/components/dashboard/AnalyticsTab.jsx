@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart3, TrendingUp, CheckSquare, Activity, Target, Smile, Meh, Frown } from 'lucide-react';
+import { BarChart3, TrendingUp, CheckSquare, Activity, Target, Smile, Meh, Frown, Calendar } from 'lucide-react';
 
 const T = {
   card: '#08080f', accent: '#6366f1', accent2: '#8b5cf6',
@@ -52,23 +52,47 @@ const StatCard = ({ icon: Icon, label, value, color, sub, index }) => (
   </motion.div>
 );
 
+// Date range filter options — label shown in UI + cutoff in days (null = all time)
+const RANGES = [
+  { label: 'All time', days: null },
+  { label: '90 days',  days: 90 },
+  { label: '30 days',  days: 30 },
+  { label: '7 days',   days: 7 },
+];
+
+/**
+ * Filter meetings by date range.
+ * Uses the meeting's `date` field. Meetings without a date are excluded when
+ * a range is active so they don't inflate "all time" counts accidentally.
+ */
+function filterByRange(meetings, days) {
+  if (!days) return meetings; // "All time" — no filter
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  return meetings.filter(m => m.date && new Date(m.date) >= cutoff);
+}
+
 const AnalyticsTab = ({ meetings }) => {
-  const total = meetings.length;
-  const completed = meetings.filter(m => m.status === 'completed');
-  const upcoming = meetings.filter(m => m.status === 'upcoming').length;
-  const processing = meetings.filter(m => m.status === 'processing').length;
-  const canceled = meetings.filter(m => m.status === 'canceled').length;
+  const [range, setRange] = useState(null); // null = "All time"
+
+  // Apply the selected date filter before computing any stats
+  const filtered = filterByRange(meetings, range);
+  const total = filtered.length;
+  const completed = filtered.filter(m => m.status === 'completed');
+  const upcoming = filtered.filter(m => m.status === 'upcoming').length;
+  const processing = filtered.filter(m => m.status === 'processing').length;
+  const canceled = filtered.filter(m => m.status === 'canceled').length;
 
   const withHealth = completed.filter(m => m.healthScore > 0);
   const avgHealth = withHealth.length > 0
     ? Math.round(withHealth.reduce((s, m) => s + m.healthScore, 0) / withHealth.length)
     : 0;
 
-  const totalActions = meetings.reduce((s, m) => s + (m.actionItems?.length || 0), 0);
+  const totalActions = filtered.reduce((s, m) => s + (m.actionItems?.length || 0), 0);
 
-  const positive = meetings.filter(m => m.sentiment === 'positive').length;
-  const neutral = meetings.filter(m => m.sentiment === 'neutral').length;
-  const negative = meetings.filter(m => m.sentiment === 'negative').length;
+  const positive = filtered.filter(m => m.sentiment === 'positive').length;
+  const neutral = filtered.filter(m => m.sentiment === 'neutral').length;
+  const negative = filtered.filter(m => m.sentiment === 'negative').length;
 
   const sentimentTotal = positive + neutral + negative;
   const pct = (n) => sentimentTotal > 0 ? Math.round((n / sentimentTotal) * 100) : 0;
@@ -85,7 +109,7 @@ const AnalyticsTab = ({ meetings }) => {
     { icon: Activity, label: 'Total Action Items', value: totalActions, color: '#f59e0b', sub: 'across all meetings', index: 3 },
   ];
 
-  if (total === 0) {
+  if (meetings.length === 0) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: 14 }}>
         <div style={{ width: 64, height: 64, borderRadius: 18, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(99,102,241,0.5)' }}>
@@ -99,11 +123,71 @@ const AnalyticsTab = ({ meetings }) => {
     );
   }
 
+  // Meetings exist but none fall in the selected range
+  if (total === 0) {
+    return (
+      <motion.div initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 22 }}>
+          <div>
+            <h2 style={{ fontFamily: "'Sora',sans-serif", fontSize: 20, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Analytics</h2>
+            <div style={{ fontSize: 13, color: T.muted2, fontFamily: "'DM Sans',sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Calendar size={12} /> 0 meetings in the last {range} days
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {RANGES.map(r => {
+              const active = range === r.days;
+              return (
+                <button key={r.label} onClick={() => setRange(r.days)} style={{ padding: '6px 14px', borderRadius: 99, fontFamily: "'Sora',sans-serif", fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none', background: active ? 'rgba(99,102,241,0.25)' : 'rgba(255,255,255,0.05)', color: active ? '#818cf8' : T.muted2, boxShadow: active ? '0 0 0 1px rgba(99,102,241,0.5)' : '0 0 0 1px rgba(255,255,255,0.08)' }}>
+                  {r.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div style={{ textAlign: 'center', padding: '60px 0', color: T.muted2, fontSize: 13, fontFamily: "'DM Sans',sans-serif" }}>
+          No meetings in this date range — try a wider window.
+        </div>
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}>
-      <div style={{ marginBottom: 22 }}>
-        <h2 style={{ fontFamily: "'Sora',sans-serif", fontSize: 20, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Analytics</h2>
-        <div style={{ fontSize: 13, color: T.muted2, fontFamily: "'DM Sans',sans-serif" }}>Insights from {total} meeting{total !== 1 ? 's' : ''}</div>
+      {/* Header + date range filter */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 22 }}>
+        <div>
+          <h2 style={{ fontFamily: "'Sora',sans-serif", fontSize: 20, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Analytics</h2>
+          <div style={{ fontSize: 13, color: T.muted2, fontFamily: "'DM Sans',sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Calendar size={12} />
+            {total} meeting{total !== 1 ? 's' : ''}{range ? ` in the last ${range} days` : ' — all time'}
+          </div>
+        </div>
+
+        {/* Range toggle pills — clicking a pill re-filters all stats instantly */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {RANGES.map(r => {
+            const active = range === r.days;
+            return (
+              <button
+                key={r.label}
+                onClick={() => setRange(r.days)}
+                style={{
+                  padding: '6px 14px', borderRadius: 99,
+                  fontFamily: "'Sora',sans-serif", fontSize: 11, fontWeight: 700,
+                  cursor: 'pointer', border: 'none', transition: 'all 0.2s',
+                  background: active ? 'rgba(99,102,241,0.25)' : 'rgba(255,255,255,0.05)',
+                  color: active ? '#818cf8' : T.muted2,
+                  boxShadow: active ? '0 0 0 1px rgba(99,102,241,0.5)' : '0 0 0 1px rgba(255,255,255,0.08)',
+                }}
+                onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.color = '#f1f5f9'; } }}
+                onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = T.muted2; } }}
+              >
+                {r.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Stat cards */}
