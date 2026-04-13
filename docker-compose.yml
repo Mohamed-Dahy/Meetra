@@ -64,6 +64,44 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
+  # REDIS — in-memory store for chatbot session persistence + rate limiting
+  # ---------------------------------------------------------------------------
+  redis:
+    # redis:7-alpine is the official lightweight image (~30 MB).
+    # We don't build a custom image — the official one is all we need.
+    image: redis:7-alpine
+
+    # Port 6379 is exposed to the host so you can inspect sessions during
+    # development with redis-cli from your machine:
+    #   redis-cli -h localhost keys "session:*"
+    # Inside the Docker network, the chatbot connects via the service name:
+    #   redis://redis:6379/0
+    ports:
+      - "6379:6379"
+
+    # --appendonly yes enables AOF (Append-Only File) persistence.
+    # Without this, Redis stores data only in RAM — a container restart loses
+    # all sessions. AOF writes every command to /data/appendonly.aof so
+    # sessions survive clean restarts. The redis_data named volume keeps
+    # /data on the host across container re-creates.
+    command: redis-server --appendonly yes
+
+    volumes:
+      - redis_data:/data
+
+    # HEALTHCHECK — redis-cli ping returns "PONG" when Redis is ready.
+    # The chatbot uses condition: service_healthy (below) so it never starts
+    # before Redis is accepting connections.
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
   # CHATBOT — Python FastAPI + LangGraph agent (port 8000)
   # ---------------------------------------------------------------------------
   chatbot:
@@ -73,11 +111,19 @@ services:
     ports:
       - "8000:8000"
 
-    # Shares the same .env file — only reads MONGO_URI and GEMINI_API_KEY.
-    # Extra variables in .env (JWT_SECRET, RESEND_API_KEY etc.) are simply
-    # ignored by the chatbot since config.py only declares what it needs.
+    # Reads MONGO_URI, GEMINI_API_KEY, JWT_SECRET, REDIS_URI from .env.
+    # Extra variables (RESEND_API_KEY etc.) are simply ignored because
+    # config.py only declares what it needs.
     env_file:
       - .env
+
+    # depends_on with condition: service_healthy means Docker waits until
+    # Redis passes its healthcheck (redis-cli ping → PONG) before starting
+    # the chatbot. Without this, the chatbot lifespan's redis_client.connect()
+    # PING could fail if Redis is still initialising.
+    depends_on:
+      redis:
+        condition: service_healthy
 
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
@@ -134,5 +180,6 @@ services:
 # only deleted with "docker compose down -v").
 # =============================================================================
 volumes:
-  uploads_data:
-  pdfs_data:
+  uploads_data:   # Backend audio uploads
+  pdfs_data:      # Backend generated PDF reports
+  redis_data:     # Redis AOF persistence (chatbot sessions + rate limit state)
